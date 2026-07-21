@@ -21,10 +21,11 @@ module mac_rne_sat (
     // doc/spec.md. The tie-offs below only keep the skeleton compiling;
     // replace them with your implementation.
    
-// -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // 1. Internal Register Definitions
     // -------------------------------------------------------------------------
     logic signed [27:0] acc;
+    logic               rd_d;        // Delayed rd signal for res_valid pulse
 
     // Intermediate combinational signals for processing the readout path
     logic signed [27:0] snapshot;
@@ -85,6 +86,7 @@ module mac_rne_sat (
             res       <= 16'sd0;
             res_valid <= 1'b0;
             ovf       <= 1'b0;
+            rd_d      <= 1'b0;
         end else begin
             // --- Accumulator Control ---
             case ({clr, en})
@@ -95,17 +97,16 @@ module mac_rne_sat (
             endcase
 
             // --- Readout Result & Valid Flag ---
-            rd_d <= rd;
-            res_valid <= rd;
+            rd_d      <= rd;
+            res_valid <= rd_d;
             if (rd_d) 
                 res <= res_next;
-            end
 
             // --- Sticky Overflow Flag Logic ---
             // Set wins over clr if a saturating readout occurs in the same cycle.
-            if (rd_d && sat)            // Saturation always sets
+            if (rd_d && sat_occurred)            // Saturation always sets
                ovf <= 1'b1;
-            else if (clr)               // Clear only when no saturation
+            else if (clr)                       // Clear only when no saturation
                ovf <= 1'b0;
             
         end
