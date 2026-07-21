@@ -33,6 +33,7 @@ module mac_rne_sat (
     logic signed [20:0] rounded;   // Rounded value before saturation
     
     logic signed [15:0] res_next;
+    logic signed [15:0] product;
     logic               sat_occurred;
 
     // -------------------------------------------------------------------------
@@ -94,18 +95,19 @@ module mac_rne_sat (
             endcase
 
             // --- Readout Result & Valid Flag ---
+            rd_d <= rd;
             res_valid <= rd;
-            if (rd) begin
+            if (rd_d) 
                 res <= res_next;
             end
 
             // --- Sticky Overflow Flag Logic ---
             // Set wins over clr if a saturating readout occurs in the same cycle.
-            if (rd && sat_occurred) begin
-                ovf <= 1'b1;
-            end else if (clr) begin
-                ovf <= 1'b0;
-            end
+            if (rd && sat_occurred) 
+                ovf <= 1;
+            else if (clr) 
+                ovf <= 0;
+            
         end
     end
 
