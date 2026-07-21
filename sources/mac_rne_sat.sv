@@ -34,7 +34,7 @@ module mac_rne_sat (
 
     // Intermediate variables
     logic signed [27:0] q;
-    logic [7:0] r;
+    logic signed [8:0] r;
     logic signed [28:0] rounded;
     logic sat;
 
@@ -44,8 +44,8 @@ module mac_rne_sat (
 
         // Defaults
         q       = snapshot_d >>> 8;      // arithmetic divide by 256
-        r       = snapshot_d[7:0];       // remainder 0..255
-        rounded = q;
+        r       = snapshot_d - (q <<< 8);       // remainder 0..255
+        rounded = $signed(q);
         sat     = 1'b0;
 
         // Round-half-to-even
