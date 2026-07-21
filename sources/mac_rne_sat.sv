@@ -24,8 +24,7 @@ module mac_rne_sat (
     // -------------------------------------------------------------------------
     // 1. Internal Register Definitions
     // -------------------------------------------------------------------------
-    logic signed [27:0] acc;
-    logic               rd_d;        // Delayed rd signal for res_valid pulse
+    logic signed [27:0] acc;        
 
     // Intermediate combinational signals for processing the readout path
     logic signed [27:0] snapshot;
@@ -34,7 +33,7 @@ module mac_rne_sat (
     logic signed [20:0] rounded;   // Rounded value before saturation
     
     logic signed [15:0] res_next;
-    logic signed [15:0] product;
+    
     logic               sat_occurred;
 
     // -------------------------------------------------------------------------
@@ -93,13 +92,15 @@ module mac_rne_sat (
             rd_d      <= 1'b0;
         end else begin
             // --- Accumulator Control ---
+            
             case ({clr, en})
-                2'b00;
-                2'b01: acc <= acc + {{12{prod[15]}},prod}; // Accumulate
-                2'b10: acc <= 28'sd0;               // Clear
-                2'b11: acc <= {{12{prod[15]}},prod};       // Clear-then-accumulate
-             
-            endcase
+    2'b00: begin
+        // hold accumulator
+    end
+    2'b01: acc <= acc + {{12{prod[15]}}, prod};
+    2'b10: acc <= 28'sd0;
+    2'b11: acc <= {{12{prod[15]}}, prod};
+endcase
 
             // --- Readout Result & Valid Flag ---
          
