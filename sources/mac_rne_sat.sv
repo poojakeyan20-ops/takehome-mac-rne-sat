@@ -103,10 +103,10 @@ module mac_rne_sat (
 
             // --- Sticky Overflow Flag Logic ---
             // Set wins over clr if a saturating readout occurs in the same cycle.
-            if (rd && sat_occurred) 
-                ovf <= 1;
-            else if (clr) 
-                ovf <= 0;
+            if (rd_d && sat)            // Saturation always sets
+               ovf <= 1'b1;
+            else if (clr)               // Clear only when no saturation
+               ovf <= 1'b0;
             
         end
     end
