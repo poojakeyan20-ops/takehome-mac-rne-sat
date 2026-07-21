@@ -80,6 +80,10 @@ module mac_rne_sat (
     // -------------------------------------------------------------------------
     // 3. Sequential Logic & Accumulator Update
     // -------------------------------------------------------------------------
+    logic signed [15:0] prod;
+
+    assign prod = a * b;
+    
     always_ff @(posedge clk) begin
         if (rst) begin
             acc       <= 28'sd0;
@@ -90,21 +94,22 @@ module mac_rne_sat (
         end else begin
             // --- Accumulator Control ---
             case ({clr, en})
-                2'b01: acc <= acc + $signed(a * b); // Accumulate
+                2'b00;
+                2'b01: acc <= acc + {{12{prod[15]}},prod}; // Accumulate
                 2'b10: acc <= 28'sd0;               // Clear
-                2'b11: acc <= $signed(a * b);       // Clear-then-accumulate
-                default: acc <= acc;               // Hold
+                2'b11: acc <= {{12{prod[15]}},prod};       // Clear-then-accumulate
+             
             endcase
 
             // --- Readout Result & Valid Flag ---
-            rd_d      <= 1'b0;
-            res_valid <= rd_d;
-            if (rd_d) 
+         
+            res_valid <= rd;
+            if (rd) 
                 res <= res_next;
 
             // --- Sticky Overflow Flag Logic ---
             // Set wins over clr if a saturating readout occurs in the same cycle.
-            if (rd_d && sat_occurred)            // Saturation always sets
+            if (rd && sat_occurred)            // Saturation always sets
                ovf <= 1'b1;
             else if (clr)                       // Clear only when no saturation
                ovf <= 1'b0;
