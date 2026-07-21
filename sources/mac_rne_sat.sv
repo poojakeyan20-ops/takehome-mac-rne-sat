@@ -97,7 +97,7 @@ module mac_rne_sat (
             endcase
 
             // --- Readout Result & Valid Flag ---
-            rd_d      <= rd;
+            rd_d      <= 1'b0;
             res_valid <= rd_d;
             if (rd_d) 
                 res <= res_next;
