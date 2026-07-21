@@ -35,6 +35,7 @@ module mac_rne_sat (
     logic signed [15:0] res_next;
     
     logic               sat_occurred;
+    logic rd_d;
 
     // -------------------------------------------------------------------------
     // 2. Readout Path (Combinational)
@@ -81,7 +82,7 @@ module mac_rne_sat (
     // -------------------------------------------------------------------------
     logic signed [15:0] prod;
 
-    assign prod = a * b;
+    assign prod = $signed(a) * $signed(b);
     
     always_ff @(posedge clk) begin
         if (rst) begin
@@ -89,14 +90,12 @@ module mac_rne_sat (
             res       <= 16'sd0;
             res_valid <= 1'b0;
             ovf       <= 1'b0;
-            rd_d      <= 1'b0;
         end else begin
             // --- Accumulator Control ---
             
             case ({clr, en})
-    2'b00: begin
+    2'b00: acc <= acc;
         // hold accumulator
-    end
     2'b01: acc <= acc + {{12{prod[15]}}, prod};
     2'b10: acc <= 28'sd0;
     2'b11: acc <= {{12{prod[15]}}, prod};
