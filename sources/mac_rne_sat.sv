@@ -21,93 +21,90 @@ module mac_rne_sat (
     // doc/spec.md. The tie-offs below only keep the skeleton compiling;
     // replace them with your implementation.
    
-    // 28-bit accumulator
+// -------------------------------------------------------------------------
+    // 1. Internal Register Definitions
+    // -------------------------------------------------------------------------
     logic signed [27:0] acc;
 
-    // Pipeline registers for read request
-    logic               rd_d;
-    logic signed [27:0] snapshot_d;
+    // Intermediate combinational signals for processing the readout path
+    logic signed [27:0] snapshot;
+    logic signed [19:0] q;         // floor(snapshot / 256) -> snapshot >>> 8
+    logic        [7:0]  r;         // Remainder: snapshot [7:0]
+    logic signed [20:0] rounded;   // Rounded value before saturation
+    
+    logic signed [15:0] res_next;
+    logic               sat_occurred;
 
-    // Product
-    logic signed [15:0] prod16;
-    logic signed [27:0] prod28;
+    // -------------------------------------------------------------------------
+    // 2. Readout Path (Combinational)
+    // -------------------------------------------------------------------------
+    // Snapshot is taken BEFORE any acc updates in the current clock cycle.
+    assign snapshot = acc;
 
-    // Intermediate variables
-    logic signed [27:0] q;
-    logic signed [8:0] r;
-    logic signed [28:0] rounded;
-    logic sat;
+    // In two's complement, right shifting arithmetic (>>>) gives floor(snapshot / 256).
+    // The lower 8 bits directly yield the positive remainder r in [0, 255].
+    assign q = snapshot >>> 8;
+    assign r = snapshot[7:0];
 
+    // Round-Half-to-Even (RNE) Logic at 8 LSBs
     always_comb begin
-        prod16 = a * b;
-        prod28 = {{12{prod16[15]}}, prod16};
-
-        // Defaults
-        q       = snapshot_d >>> 8;      // arithmetic divide by 256
-        r       = snapshot_d - (q <<< 8);       // remainder 0..255
-        rounded = $signed(q);
-        sat     = 1'b0;
-
-        // Round-half-to-even
-        if (r > 8'd128)
-            rounded = q + 1;
-        else if (r == 8'd128) begin
-            if (q[0])
-                rounded = q + 1;
-        end
-
-        // Saturation detection
-        if (rounded > 32767) begin
-            sat = 1'b1;
-        end
-        else if (rounded < -32768) begin
-            sat = 1'b1;
+        if (r < 8'd128) begin
+            rounded = q;
+        end else if (r > 8'd128) begin
+            rounded = q + 1'b1;
+        end else begin // r == 128 (Exact tie)
+            if (q[0] == 1'b1) begin
+                rounded = q + 1'b1; // Odd q rounds up to even
+            end else begin
+                rounded = q;        // Even q stays even
+            end
         end
     end
 
+    // Saturation Logic: Clamping to [-32768, +32767]
+    always_comb begin
+        if (rounded > 21'sd32767) begin
+            res_next     = 16'sd32767;
+            sat_occurred = 1'b1;
+        end else if (rounded < -21'sd32768) begin
+            res_next     = -16'sd32768;
+            sat_occurred = 1'b1;
+        end else begin
+            res_next     = rounded[15:0];
+            sat_occurred = 1'b0;
+        end
+    end
+
+    // -------------------------------------------------------------------------
+    // 3. Sequential Logic & Accumulator Update
+    // -------------------------------------------------------------------------
     always_ff @(posedge clk) begin
         if (rst) begin
-            acc        <= 28'sd0;
-            snapshot_d <= 28'sd0;
-            rd_d       <= 1'b0;
-            res        <= 16'sd0;
-            res_valid  <= 1'b0;
-            ovf        <= 1'b0;
-        end
-        else begin
-            // Pipeline read request
-            rd_d <= rd;
-            if (rd)
-                snapshot_d <= acc;
+            acc       <= 28'sd0;
+            res       <= 16'sd0;
+            res_valid <= 1'b0;
+            ovf       <= 1'b0;
+        end else begin
+            // --- Accumulator Control ---
+            case ({clr, en})
+                2'b01: acc <= acc + $signed(a * b); // Accumulate
+                2'b10: acc <= 28'sd0;               // Clear
+                2'b11: acc <= $signed(a * b);       // Clear-then-accumulate
+                default: acc <= acc;               // Hold
+            endcase
 
-            // res_valid pulse
-            res_valid <= rd_d;
-
-            // Produce read result
-            if (rd_d) begin
-                if (rounded > 32767)
-                    res <= 16'sd32767;
-                else if (rounded < -32768)
-                    res <= -16'sd32768;
-                else
-                    res <= rounded[15:0];
+            // --- Readout Result & Valid Flag ---
+            res_valid <= rd;
+            if (rd) begin
+                res <= res_next;
             end
 
-            // Sticky overflow flag
-            if (rd_d && sat)
+            // --- Sticky Overflow Flag Logic ---
+            // Set wins over clr if a saturating readout occurs in the same cycle.
+            if (rd && sat_occurred) begin
                 ovf <= 1'b1;
-            else if (clr)
+            end else if (clr) begin
                 ovf <= 1'b0;
-
-            // Accumulator update
-            if (clr) begin
-                if (en)
-                    acc <= prod28;
-                else
-                    acc <= 28'sd0;
-            end
-            else if (en) begin
-                acc <= acc + prod28;
             end
         end
     end
